@@ -48,8 +48,8 @@ class MyImgClass():
         :return: the subtraction of the two classes
         :rtype: MyImgClass
         """
-        ### TO IMPLEMENT ###
-        raise NotImplementedError('You need to implement this method!')
+
+        return MyImgClass(np.subtract(self.arrImg, other.arrImg), intLabel=None)
         
     
     def fPixelwiseSqDif(self, other):
@@ -62,7 +62,9 @@ class MyImgClass():
         """
         ### TO IMPLEMENT ###
         # Use the overloaded '-' from above
-        raise NotImplementedError('You need to implement this method!')
+        diff = self - other
+
+        return MyImgClass(np.square(diff.arrImg), intLabel=None)
     
     
     
@@ -74,8 +76,8 @@ class MyImgClass():
         :return: MSE
         :rtype: float
         """
-        ### TO IMPLEMENT ###
-        raise NotImplementedError('You need to implement this method!')
+        squared_diff_img_obj = self.fPixelwiseSqDif(other)
+        return np.mean(squared_diff_img_obj.arrImg)
 
     
     def fPlot(self, ax, show_ticks=False, add_colorbar=False, imshow_kwargs={}):
@@ -110,8 +112,9 @@ class MyImgClass():
         :return: The mean image
         :rtype: MyImgClass
         """
-        ### TO IMPLEMENT ###
-        raise NotImplementedError('You need to implement this method!')
+        npmean = np.mean([i.arrImg for  i in lMyImgClass],axis=0)
+        return MyImgClass(npmean, intLabel=None)
+        # raise NotImplementedError('You need to implement this method!')
     
     @staticmethod
     def fComputeStdAcrossImages(lMyImgClass):
@@ -122,8 +125,25 @@ class MyImgClass():
         :return: The std image
         :rtype: MyImgClass
         """
-        ### TO IMPLEMENT ###
-        raise NotImplementedError('You need to implement this method!')
+        # image_arrays = []
+        # first_shape = None
+        # for i, img_obj in enumerate(lMyImgClass):
+        #     if not isinstance(img_obj, MyImgClass): # MyImgClass should be in scope
+        #         raise TypeError(f"All items in lMyImgClass must be MyImgClass instances. Found {type(img_obj)} at index {i}.")
+            
+        #     if i == 0:
+        #         first_shape = img_obj.shape
+        #     elif img_obj.shape != first_shape:
+        #         raise ValueError("All images in the list must have the same dimensions to compute standard deviation across them.")
+            
+        #     image_arrays.append(img_obj.arrImg)
+
+        # Calculate the standard deviation across the images (pixel-wise)
+        # np.std will operate along the first axis (axis=0) of the stacked image arrays.
+        # std_dev_array = np.std(image_arrays, axis=0)
+        npstd = np.std([i.arrImg for  i in lMyImgClass],axis=0)
+        # Wrap the resulting numpy array in a MyImgClass object
+        return MyImgClass(npstd, intLabel=None)
         
 
     @staticmethod
@@ -138,8 +158,8 @@ class MyImgClass():
         :return: mean MSE
         :rtype: float
         """
-        ### TO IMPLEMENT ###
-        raise NotImplementedError('You need to implement this method!')
+        lista = [lImg1[i].fMSE(lImg2[i]) for i in range(len(lImg1))]        
+        return np.mean(lista)
 
 
     @staticmethod
