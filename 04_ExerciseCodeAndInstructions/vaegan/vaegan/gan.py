@@ -44,7 +44,7 @@ class Generator(tf.keras.Model):
                                   self.image_shape[1] // (2 ** n_strided_layers),
                                   n_first_layer_filters)
         
-        dense_neurons = np.product(first_conv_input_shape)
+        dense_neurons = np.prod(first_conv_input_shape)
         
         self.dense = tkl.Dense(dense_neurons, name='dense')
         self.relu_dense = tkl.LeakyReLU(name='relu_dense')
