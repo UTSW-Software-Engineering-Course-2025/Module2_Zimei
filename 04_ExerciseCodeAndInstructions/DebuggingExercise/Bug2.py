@@ -12,11 +12,12 @@ def build_new_dictionary_from_input(dIn):
         updated dictionary
     """
     nTotal = 0
+    dOUT = dIn.copy()  # Create a copy of the input dictionary
     for key in dIn.keys():
         nTotal += dIn[key]
     #Adding total to the dictionary
-    dIn['Total'] = nTotal
-    return dIn
+    dOUT['Total'] = nTotal
+    return dOUT
 
 dOuput = {}
 dInput = {'A':1,
