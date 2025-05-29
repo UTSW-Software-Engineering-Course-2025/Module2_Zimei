@@ -82,10 +82,10 @@ if __name__ == "__main__":
     EPOCHS = 5
     for epoch in range(EPOCHS):
         # Reset the metrics at the start of the next epoch
-        train_loss.reset_states()
-        train_accuracy.reset_states()
-        test_loss.reset_states()
-        test_accuracy.reset_states()
+        train_loss.reset_state()
+        train_accuracy.reset_state()
+        test_loss.reset_state()
+        test_accuracy.reset_state()
 
         for images, labels in train_ds:
             train_step(images, labels)
