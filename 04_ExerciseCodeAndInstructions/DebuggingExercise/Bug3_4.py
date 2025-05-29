@@ -17,7 +17,7 @@ tf.config.experimental.set_virtual_device_configuration(
 def normalize_data(x):
     x_mean = np.mean(x, axis=0)
     x_std = np.std(x, axis=0)
-    return (x - x_mean) / x_std 
+    return (x - x_mean) / (x_std + 1e-7)
 
 class MyModel(Model):
     def __init__(self):
@@ -91,7 +91,7 @@ if __name__ == "__main__":
             train_step(images, labels)
 
         for test_images, test_labels in test_ds:
-            test_step(images, test_labels)
+            test_step(test_images, test_labels)
 
         print(
             f"Epoch {epoch + 1}, "
