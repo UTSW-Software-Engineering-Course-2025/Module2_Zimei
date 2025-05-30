@@ -244,7 +244,7 @@ class Decoder(tf.keras.Model):
                                   self.image_shape[1] // (2 ** n_encoder_strided_layers),
                                   n_encoder_last_filters)
         
-        dense_neurons = np.product(first_conv_input_shape)
+        dense_neurons = np.prod(first_conv_input_shape)
         
         self.decoder_layers = []
         # Dense Layer blocks

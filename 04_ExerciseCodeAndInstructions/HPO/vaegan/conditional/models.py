@@ -44,6 +44,12 @@ class ConditionalVAEGAN(VAEGAN):
         
         return tf.concat([images, labels_tensor], axis=-1)
     
+    def compile(self, optimizer_encoder, optimizer_decoder, optimizer_discriminator, **kwargs):
+        super().compile(**kwargs)
+        self.optimizer_encoder = optimizer_encoder
+        self.optimizer_decoder = optimizer_decoder
+        self.optimizer_disc = optimizer_discriminator    
+
     def call(self, inputs, training=None):
         images, classes = inputs
         encoder_inputs = self.make_conditional_input(images, classes)
@@ -139,9 +145,9 @@ class ConditionalVAEGAN(VAEGAN):
         # Apply the gradient descent steps to each submodel. The optimizer
         # attribute is created when model.compile(optimizer) is called by the
         # user.
-        self.optimizer.apply_gradients(zip(grads_enc, self.encoder.trainable_weights))
-        self.optimizer.apply_gradients(zip(grads_dec, self.decoder.trainable_weights))
-        self.optimizer.apply_gradients(zip(grads_disc, self.discriminator.trainable_weights))           
+        self.optimizer_encoder.apply_gradients(zip(grads_enc, self.encoder.trainable_weights))
+        self.optimizer_decoder.apply_gradients(zip(grads_dec, self.decoder.trainable_weights))
+        self.optimizer_disc.apply_gradients(zip(grads_disc, self.discriminator.trainable_weights))           
         
         # Update the running means of the losses
         self.loss_recon_tracker.update_state(recon_loss)
@@ -302,7 +308,16 @@ class ConditionalVAECGAN(ConditionalVAEGAN):
                 self.loss_dec_tracker,
                 self.loss_disc_tracker,
                 self.metric_class]
-    
+    def compile(self, optimizer_encoder, optimizer_decoder, optimizer_discriminator, **kwargs):
+        super().compile(
+            optimizer_encoder=optimizer_encoder,
+            optimizer_decoder=optimizer_decoder,
+            optimizer_discriminator=optimizer_discriminator,
+            **kwargs
+        )
+        self.optimizer_encoder = optimizer_encoder
+        self.optimizer_decoder = optimizer_decoder
+        self.optimizer_disc = optimizer_discriminator        
     def train_step(self, data):
         """Defines a single training iteration, including the forward pass,
         computation of losses, backpropagation, and weight updates.
@@ -400,9 +415,9 @@ class ConditionalVAECGAN(ConditionalVAEGAN):
         # Apply the gradient descent steps to each submodel. The optimizer
         # attribute is created when model.compile(optimizer) is called by the
         # user.
-        self.optimizer.apply_gradients(zip(grads_enc, self.encoder.trainable_weights))
-        self.optimizer.apply_gradients(zip(grads_dec, self.decoder.trainable_weights))
-        self.optimizer.apply_gradients(zip(grads_disc, self.discriminator.trainable_weights))           
+        self.optimizer_encoder.apply_gradients(zip(grads_enc, self.encoder.trainable_weights))
+        self.optimizer_decoder.apply_gradients(zip(grads_dec, self.decoder.trainable_weights))
+        self.optimizer_disc.apply_gradients(zip(grads_disc, self.discriminator.trainable_weights))           
         
         # Update the running means of the losses
         self.loss_recon_tracker.update_state(recon_loss)
