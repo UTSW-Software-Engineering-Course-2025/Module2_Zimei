@@ -533,10 +533,10 @@ class VAE(tf.keras.Model):
 
         # 8. Compute the gradients for each loss wrt their respectively model weights
         #    A) Use the gradient tape to compute the gradients for the encoder and store the results in grads_enc
-        grads_enc = tape.gradient(total_loss, self.encoder.trainable_variables)
+        # grads_enc = tape.gradient(total_loss, self.encoder.trainable_variables)
         #    B) Use the gradient tape to compute the gradients for the dencoder and store the results in grads_dec
     
-        grads_dec = tape.gradient(total_loss, self.decoder.trainable_variables)
+        # grads_dec = tape.gradient(total_loss, self.decoder.trainable_variables)
 
         # 9. Apply the gradient descent steps to each submodel. The optimizer
         # attribute is created when model.compile(optimizer) is called by the
@@ -727,28 +727,32 @@ class ConditionalVAE(VAE):
             kl_loss = kl_divergence(z_mean, z_logvar)
             # Compute reconstruction loss
             recon_loss_pixel = self.loss_recon(images_real, recons)
-            recon_loss_sample = tf.reduce_sum(recon_loss_pixel, axis=(1, 2))
-            recon_loss = tf.reduce_mean(recon_loss_sample)
-            total_loss = recon_loss + self.kl_loss_weight * kl_loss
+
 
             # Recon loss is computed per pixel. Sum over the pixels and then
             # average across samples.
-            
+            recon_loss_sample = tf.reduce_sum(recon_loss_pixel, axis=(1, 2))
+            recon_loss = tf.reduce_mean(recon_loss_sample)
             # Sum the loss terms
+            total_loss = recon_loss + self.kl_loss_weight * kl_loss
 
                        
         # Follow steps 8-10 from the VAE.train_step()
-        # 8. Compute the gradients for each loss wrt their respectively model weights
-        grads_enc = tape.gradient(total_loss, self.encoder.trainable_variables)
-        grads_dec = tape.gradient(total_loss, self.decoder.trainable_variables)
-        # 9. Apply the gradient descent steps to each submodel. The optimizer
-        # attribute is created when model.compile(optimizer) is called by the
-        # user.
-        self.optimizer.apply_gradients(zip(grads_enc, self.encoder.trainable_variables))
-        self.optimizer.apply_gradients(zip(grads_dec, self.decoder.trainable_variables))
+        # # 8. Compute the gradients for each loss wrt their respectively model weights
+        # grads_enc = tape.gradient(total_loss, self.encoder.trainable_variables)
+        # grads_dec = tape.gradient(total_loss, self.decoder.trainable_variables)
+        # # 9. Apply the gradient descent steps to each submodel. The optimizer
+        # # attribute is created when model.compile(optimizer) is called by the
+        # # user.
+        # self.optimizer.apply_gradients(zip(grads_enc, self.encoder.trainable_variables))
+        # self.optimizer.apply_gradients(zip(grads_dec, self.decoder.trainable_variables))
+        grads = tape.gradient(total_loss, self.trainable_variables)
+        self.optimizer.apply_gradients(zip(grads, self.trainable_variables))  
         # 10. Update the running means of the losses
         self.loss_recon_tracker.update_state(recon_loss)
         self.loss_kl_tracker.update_state(kl_loss)
+        self.loss_total_tracker.update_state(total_loss)
+
         # [Given] Get the current values of these running means as a dict. These values
         # will be printed in the progress bar.
         dictLosses = {loss.name: loss.result() for loss in self.metrics}
