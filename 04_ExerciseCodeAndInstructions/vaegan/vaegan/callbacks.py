@@ -5,13 +5,14 @@ import tensorflow as tf
 from tensorflow.keras.callbacks import Callback
 
 # local def. AAM
+@tf.function
 def sfn(dist_mean, dist_logvar):
     z = tf.random.normal(shape=tf.shape(dist_mean))
     sampledZ = dist_mean + tf.exp(0.5 * dist_logvar) * z
     return sampledZ
 
 class GenerateImages(Callback):
-    def __init__(self, output_dir, model, 
+    def __init__(self, output_dir, 
                  cmap='gray',
                  n_generated_images=10, 
                  n_latent_dims=8):
@@ -31,7 +32,6 @@ class GenerateImages(Callback):
         self.cmap = cmap
         self.n_generated_images = n_generated_images
         self.n_latent_dims = n_latent_dims
-        self.model = model
         
     def on_epoch_end(self, epoch, logs=None):
         """Overrides the on_epoch_end method of the superclass Callback. Here,
@@ -74,7 +74,7 @@ class GenerateImages(Callback):
   
         
 class SaveImages(Callback):
-    def __init__(self, output_dir, model, example_images, 
+    def __init__(self, output_dir,  example_images, model,
                  n_generated_images=10, 
                  n_latent_dims=8):
         """Callback for saving examples of reconstructions and synthetic 
@@ -93,7 +93,7 @@ class SaveImages(Callback):
         self.example_images = example_images
         self.n_generated_images = n_generated_images
         self.n_latent_dims = n_latent_dims
-        self.model = model
+        # self.cbmodel = model
         
     def on_epoch_end(self, epoch, logs=None):
         """Overrides the on_epoch_end method of the superclass Callback. Here,
@@ -114,7 +114,7 @@ class SaveImages(Callback):
                 includes this argument, we have to include it in our overriding 
                 method. Defaults to None.
         """        
-        del logs # Unused
+        # del logs # Unused
         
         # Compress images into probabilistic latent representations with
         # encoder. Note that calling the encoder model on a numpy array yields
@@ -125,7 +125,10 @@ class SaveImages(Callback):
         # Reconstruct images with decoder
         recons = self.model.decoder(z_real)
         # Convert from tensors to numpy arrays
-        recons = recons.numpy()
+        if tf.executing_eagerly():
+            recons = recons.numpy()
+        else:
+            recons = tf.keras.backend.get_value(recons)
         n_recons = recons.shape[0]
         
         # Use the gray colormap if the image is grayscale (last dimension is 1),
@@ -151,12 +154,15 @@ class SaveImages(Callback):
         # Generate some synthetic images from random latent representations
         z_random = tf.random.normal((self.n_generated_images, self.n_latent_dims))
         images_fake = self.model.decoder(z_random)
-        
+        if tf.executing_eagerly():
+            images_fake_np = images_fake.numpy()
+        else:
+            images_fake_np = tf.keras.backend.get_value(images_fake)
         # Create a figure with these generated images
         fig2, ax2 = plt.subplots(1, self.n_generated_images, 
                                  figsize=(self.n_generated_images, 1))
         for i in range(self.n_generated_images):
-            ax2[i].imshow(images_fake[i], cmap=cmap)              
+            ax2[i].imshow(images_fake_np[i], cmap=cmap)              
             ax2[i].axis('off')
         
         # Save to PNG file

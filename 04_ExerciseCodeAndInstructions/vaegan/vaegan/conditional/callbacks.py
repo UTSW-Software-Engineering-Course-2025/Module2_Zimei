@@ -155,7 +155,10 @@ class SaveImagesConditional(Callback):
         decoder_inputs = tf.concat([z_real, self.labels_tensor], axis=1)
         recons = self.model.decoder(decoder_inputs)
         # Convert from tensors to numpy arrays
-        recons = recons.numpy()
+        if tf.executing_eagerly():
+            recons = recons.numpy()
+        else:
+            recons = tf.keras.backend.get_value(recons)
         n_recons = recons.shape[0]
         
         # Use the gray colormap if the image is grayscale (last dimension is 1),
