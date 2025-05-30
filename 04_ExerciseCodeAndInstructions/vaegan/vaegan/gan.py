@@ -391,29 +391,24 @@ class GAN(tf.keras.Model):
         # 14. NOT indented: compute the gradient of the lost wrt the generator weights
         #  in a new variable, grads_gen store the gradients of gen_loss with respect to the generator's trainable weights         
 
-        
+        grads_gen = tape_gen.gradient(gen_loss, self.generator.trainable_variables)
         # 15. Apply the weight updates
         #    use self.optimizer_gen to apply the weight updates. 
-
+        self.optimizer_gen.apply_gradients(zip(grads_gen, self.generator.trainable_variables))
         
         # 16. Update the running means of the losses including loss_gen_tracker and loss_disc_tracker
-
+        self.loss_disc_tracker.update_state(disc_loss)
+        self.loss_gen_tracker.update_state(gen_loss)
 
 
         # [ 17. ] Get the current values of these running means as a dict. These values
         # will be printed in the progress bar.
         # To help you along this is given. Just uncomment the "##" lines below
-        ##dictLosses = {loss.name: loss.result() for loss in self.metrics}
+        dictLosses = {loss.name: loss.result() for loss in self.metrics}
 
         # return the dictionary of losses
         ##return dictLosses
-        grads_gen = tape_gen.gradient(gen_loss, self.generator.trainable_variables)
-        self.optimizer_gen.apply_gradients(zip(grads_gen, self.generator.trainable_variables))
-
-        self.loss_disc_tracker.update_state(disc_loss)
-        self.loss_gen_tracker.update_state(gen_loss)
-
-        return {loss.name: loss.result() for loss in self.metrics}
+        return dictLosses
 
     def get_config(self):
         # To allow saving and loading of a custom model, we need to implement a
@@ -575,8 +570,8 @@ class ConditionalGAN(GAN):
         self.discriminator = MultiTaskDiscriminator(n_classes)
         
         # Categorical cross-entropy loss for discriminator classification
-        self.loss_class_fn = tf.keras.losses.CategoricalCrossentropy(from_logits=True)
-        self.metric_class = tf.keras.metrics.CategoricalAccuracy(name='class_acc')    
+        self.loss_class = tf.keras.losses.CategoricalCrossentropy(from_logits=True,name='class_loss')
+        self.metric_class = tf.keras.metrics.CategoricalAccuracy(name = 'class_acc_metric')    
         self.loss_gen_tracker = tf.keras.metrics.Mean(name="gen_loss")
         self.loss_disc_tracker = tf.keras.metrics.Mean(name="disc_loss")
         self.loss_fn_disc = tf.keras.losses.BinaryCrossentropy(from_logits=True)
@@ -640,7 +635,7 @@ class ConditionalGAN(GAN):
         images_disc = tf.concat([images_real, images_fake], axis=0)
         labels_disc = tf.concat([label_real, label_fake], axis=0)
 
-        with tf.GradientTape() as gt:
+        with tf.GradientTape() as tape:
             # Discriminator predictions
             pred_all, pred_class_all = self.discriminator(images_disc, training=True)
 
@@ -649,7 +644,7 @@ class ConditionalGAN(GAN):
 
             # Classification loss: real image classification
             pred_class_real = pred_class_all[:nbatch] 
-            loss_disc_class = self.loss_class_fn(class_real, pred_class_real)
+            loss_disc_class = self.loss_class(class_real, pred_class_real)
 
             # Total discriminator loss
             loss_disc_total = loss_disc_real_fake + loss_disc_class
@@ -657,7 +652,7 @@ class ConditionalGAN(GAN):
             # Update metric
             self.metric_class.update_state(class_real, pred_class_real)
 
-        grads_disc = gt.gradient(loss_disc_total, self.discriminator.trainable_weights)
+        grads_disc = tape.gradient(loss_disc_total, self.discriminator.trainable_weights)
         self.optimizer_disc.apply_gradients(zip(grads_disc, self.discriminator.trainable_weights))
 
         # Step 2: Train the generator
@@ -665,7 +660,7 @@ class ConditionalGAN(GAN):
         class_fake = self.generate_random_classes(nbatch)
         z_cond_fake = tf.concat([latent_fake, class_fake], axis=1)
 
-        with tf.GradientTape() as gt2:
+        with tf.GradientTape() as tape2:
             images_fake = self.generator(z_cond_fake, training=True)
             pred_fake, pred_class_fake = self.discriminator(images_fake, training=False)
             print("pred_class_fake:", pred_class_fake.shape)
@@ -677,13 +672,13 @@ class ConditionalGAN(GAN):
 
             # Generator tries to classify correctly
 
-            loss_gen_class = self.loss_class_fn(class_fake, pred_class_fake)
+            loss_gen_class = self.loss_class(class_fake, pred_class_fake)
 
 
             # Total generator loss
             loss_gen_total = loss_gen_gan + self.cond_loss_weight * loss_gen_class
 
-        grads_gen = gt2.gradient(loss_gen_total, self.generator.trainable_weights)
+        grads_gen = tape2.gradient(loss_gen_total, self.generator.trainable_weights)
         self.optimizer_gen.apply_gradients(zip(grads_gen, self.generator.trainable_weights))
 
         # Update trackers

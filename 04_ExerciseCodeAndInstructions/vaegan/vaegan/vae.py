@@ -533,20 +533,19 @@ class VAE(tf.keras.Model):
 
         # 8. Compute the gradients for each loss wrt their respectively model weights
         #    A) Use the gradient tape to compute the gradients for the encoder and store the results in grads_enc
-        # grads_enc = tape.gradient(total_loss, self.encoder.trainable_variables)
+        grads_enc = tape.gradient(total_loss, self.encoder.trainable_variables)
         #    B) Use the gradient tape to compute the gradients for the dencoder and store the results in grads_dec
     
-        # grads_dec = tape.gradient(total_loss, self.decoder.trainable_variables)
+        grads_dec = tape.gradient(total_loss, self.decoder.trainable_variables)
 
         # 9. Apply the gradient descent steps to each submodel. The optimizer
         # attribute is created when model.compile(optimizer) is called by the
         # user.
         # A) First apply the gradient to the encoder. use self.optimizer.apply_gradients()
-        # self.optimizer.apply_gradients(zip(grads_enc, self.encoder.trainable_variables))
+        self.optimizer.apply_gradients(zip(grads_enc, self.encoder.trainable_variables))
         # B) Then apply the gradient to the decoder. use self.optimizer.apply_gradients()       
-        # self.optimizer.apply_gradients(zip(grads_dec, self.decoder.trainable_variables))
-        grads = tape.gradient(total_loss, self.trainable_variables)
-        self.optimizer.apply_gradients(zip(grads, self.trainable_variables))  
+        self.optimizer.apply_gradients(zip(grads_dec, self.decoder.trainable_variables))
+ 
         # [ 10. ] Update the running means of the losses
         #  To simplify we provide this code for you 
         self.loss_recon_tracker.update_state(recon_loss)
@@ -687,7 +686,7 @@ class ConditionalVAE(VAE):
         recons = self.decoder(decoder_inputs, training=training)
 
 
-        return recons   # finally we return the reconstructed image, which is a primary output of a VAE.
+        return recons   
     
     def train_step(self, data):
         """Defines a single training iteration, including the forward pass,
@@ -739,15 +738,14 @@ class ConditionalVAE(VAE):
                        
         # Follow steps 8-10 from the VAE.train_step()
         # # 8. Compute the gradients for each loss wrt their respectively model weights
-        # grads_enc = tape.gradient(total_loss, self.encoder.trainable_variables)
-        # grads_dec = tape.gradient(total_loss, self.decoder.trainable_variables)
+        grads_enc = tape.gradient(total_loss, self.encoder.trainable_variables)
+        grads_dec = tape.gradient(total_loss, self.decoder.trainable_variables)
         # # 9. Apply the gradient descent steps to each submodel. The optimizer
         # # attribute is created when model.compile(optimizer) is called by the
         # # user.
-        # self.optimizer.apply_gradients(zip(grads_enc, self.encoder.trainable_variables))
-        # self.optimizer.apply_gradients(zip(grads_dec, self.decoder.trainable_variables))
-        grads = tape.gradient(total_loss, self.trainable_variables)
-        self.optimizer.apply_gradients(zip(grads, self.trainable_variables))  
+        self.optimizer.apply_gradients(zip(grads_enc, self.encoder.trainable_variables))
+        self.optimizer.apply_gradients(zip(grads_dec, self.decoder.trainable_variables))
+ 
         # 10. Update the running means of the losses
         self.loss_recon_tracker.update_state(recon_loss)
         self.loss_kl_tracker.update_state(kl_loss)
