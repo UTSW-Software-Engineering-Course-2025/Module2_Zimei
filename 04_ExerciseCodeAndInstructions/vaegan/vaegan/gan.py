@@ -221,35 +221,40 @@ class GAN(tf.keras.Model):
         # 
         # 1. Call base class constructor      
         super().__init__(name=name, **kwargs)
-        
-        # 2. store the 4 necessary attributes provided to the constructor. 
-        #    Use as your attribute names, the same names as in the constructor input arguments
         self.n_latent_dims = n_latent_dims
         self.image_shape = image_shape
         self.generator_lr = generator_lr
         self.discriminator_lr = discriminator_lr
+        self.generator = Generator(image_shape=image_shape)
+        self.discriminator = Discriminator()
+        
+
+        
+        # 2. store the 4 necessary attributes provided to the constructor. 
+        #    Use as your attribute names, the same names as in the constructor input arguments
+
 
         # 3. Use the has-a mechanism to contain two construct necessary instances and store them in self.generator and self.discriminator       
-        self.generator = Generator(image_shape=self.image_shape)
-        self.discriminator = Discriminator()
-
 
         # 4. Use binary cross-entropy for the discrminator's classification loss. Store this in self.loss_bce
         # Look up the keras function losses.BinaryCrossentropy. Give it a suitable name.
-        self.loss_bce = tf.keras.losses.BinaryCrossentropy(name='classification_loss_BN')
+        self.loss_bce = tf.keras.losses.BinaryCrossentropy()
 
         # 5. Create a custom metric objects to track the running means of each loss.
         # The values will be printed in the progress bar with each training
         # iteration.
         # store them in self.loss_gen_tracker and self.loss_disc_tracker.
         # Find a suitable metric from tf.keras.metrics
-        self.loss_gen_tracker = tf.keras.metrics.Mean(name='gene_loss')
-        self.loss_disc_tracker = tf.keras.metrics.Mean(name='disc_loss')
+        self.loss_gen_tracker = tf.keras.metrics.Mean(name="loss_gen")
+        self.loss_disc_tracker = tf.keras.metrics.Mean(name="loss_disc")
+
 
         # 6. Create Adam optimizers to do the gradient descent 
         #    Store them in self.optimizer_gen and self.optimizer_disc
-        self.optimizer_gen = tf.keras.optimizers.Adam(learning_rate = self.generator_lr)
-        self.optimizer_disc = tf.keras.optimizers.Adam(learning_rate = self.discriminator_lr)
+        self.optimizer_gen = tf.keras.optimizers.Adam(learning_rate=generator_lr)
+        self.optimizer_disc = tf.keras.optimizers.Adam(learning_rate=discriminator_lr)
+
+
 
         print(f"Loaded version: {__name__}")
 
@@ -264,22 +269,18 @@ class GAN(tf.keras.Model):
     #     you will want n x n_latent_dims  samples from this normal distn.
     #  4. To generate fake images pass that sample through the forward pass of the generator, but also tell it whether we are in training mode or not, (from the GAN forward pass method input argument).
     #  5. Return the generated fake images.             
-
-    def call(self,input,training=None):
-        """Define the forward pass, which produces a generated image.
-        
-        Args:
-            inputs (tensor): Batch of inputs containing a compressed representation.
-            training (bool, optional): check if the model is training or testing model. Defaults to None.
-        Returns:
-                tensor: generated image
+    def call(self, inputs, training=None):
         """
-        n = tf.shape(input)[0]  # Get the number of samples in the batch
-        # Sample from a normal distribution
-        z_random = tf.random.normal((n, self.n_latent_dims))
-        # Generate fake images using the generator
-        images_fake = self.generator(z_random, training=training)
-        return images_fake
+        Forward pass to generate fake images from latent inputs.
+        """
+        n = tf.shape(inputs)[0]
+        z = tf.random.normal((n, self.n_latent_dims))
+        return self.generator(z, training=training)
+
+
+
+
+
 
 
     @property
@@ -295,14 +296,7 @@ class GAN(tf.keras.Model):
     # Implement the training step method, since GANs require specialized training.
     # 0. Write the def... statement and then write an appropriate doc string 
     # 1. there are two input arguments. One of them is the tensor, images_real, with the current minibatch to train upon.
-    def train_step(self, images_real):
-        """Defines a single training iteration, including the forward pass,
-        computation of losses, backpropagation, and weight updates.
-        Args:
-            images_real (tensor): Input images.
-        Returns:
-            dict: Loss values.
-        """    
+        
         # Part 1: Train the discriminator
         # 2. Generate images from random latent vectors.
         #  2a) Set n =  the number of samples by selecting the appropriate dimension using tf.shape
@@ -312,84 +306,114 @@ class GAN(tf.keras.Model):
         #     (images_fake) using the sample from the normal distn you just created in the previous substep, 2b). 
         #     Also specify that training=False 
         # 
-        n = tf.shape(images_real)[0]  # Get the number of samples in the batch
-        z_random = tf.random.normal((n, self.n_latent_dims))
-        images_fake = self.generator(z_random, training=False)
+    def train_step(self, images_real):
+        """
+        Defines one training step for GAN: discriminator and generator updates.
+        """
+        nbatch = tf.shape(images_real)[0]
+        z = tf.random.normal((nbatch, self.n_latent_dims))
+        images_fake = self.generator(z, training=False)
+
+        labels_real = tf.ones((nbatch, 1))
+        labels_fake = tf.zeros((nbatch, 1))
+
+        images_disc = tf.concat([images_real, images_fake], axis=0)
+        labels_disc = tf.concat([labels_real, labels_fake], axis=0)
+
 
 
         # 3. Create label vectors varaible, labels_real, containing ones
         #   Also create a label vector, labels_fake, containing zeros.
         #    e.g. hint for part you may want to use tf.ones
-        labels_real = tf.ones((n, 1))  # Labels for real images
-        labels_fake = tf.zeros((n, 1))  # Labels for fake images
+
+
+
 
         # 4. Concatenate real and fake images into new variable,  images_disc. Hint: See tf.concat
         #    Also concatenate real and fake labels into new varaible, labels_disc.
-        images_disc = tf.concat([images_real, images_fake], axis=0)  # Concatenate along the batch dimension
-        labels_disc = tf.concat([labels_real, labels_fake], axis=0)  # Concatenate along the batch dimension
+
+
+
         # 5. start a GraidentTape with default arguments
-        with tf.GradientTape(persistent=True) as tape:
+
 
             # 6. indented: Predict with the discriminator's forward pass via self.discriminator()
             #    store the predictions in variable, labels_pred 
             #    Specify that now, training=True
-            labels_pred = self.discriminator(images_disc, training=True)
+
             
             # 7. indented: Compute discriminator classification loss
             #    in a new variable, disc_loss, compute the binary cross entropy loss using one of the attributes of self
+        with tf.GradientTape() as tape_disc:
+            labels_pred = self.discriminator(images_disc, training=True)
             disc_loss = self.loss_bce(labels_disc, labels_pred)
+
+        grads_disc = tape_disc.gradient(disc_loss, self.discriminator.trainable_variables)
+        self.optimizer_disc.apply_gradients(zip(grads_disc, self.discriminator.trainable_variables))
 
                                    
         # 8. NOT indented: Compute the gradient of the lost wrt the discriminator weights
         #  in a new variable, grads_disc store the gradients of disc_loss with respect to the discriminator's trainable weights  
-        grads_disc = tape.gradient(disc_loss, self.discriminator.trainable_weights)
+
         
         # 9. Apply the weight updates
         #    use self.optimizer_disc to apply the weight updates. Hint: use zip
-        self.optimizer_disc.apply_gradients(zip(grads_disc, self.discriminator.trainable_weights))
+
         
         # Part 2: Train the generator
         # 10. start a GraidentTape with default arguments. Use a different tape context variable than used above.           
-        with tf.GradientTape() as tape_gen:
+
 
             # [ 11. indented: ] Generate images from random latent vectors. Generate twice as many
             # images as the batch size so that the generator sees as many
             # samples as the discriminator did. 
             #  To help you along, we give you this part 
-            z_random_gen = tf.random.normal((2 * n, self.n_latent_dims))
-            images_fake = self.generator(z_random_gen, training=True)
+
+
 
             # 12. indented: Predict with the discriminator's forward pass the labels for images_fake
             #     set training=False. Store the prediction results in new variable, labels_pred
-            labels_pred = self.discriminator(images_fake, training=False)
+
             
             # 13. indented: We want to the discriminator to think these images are real, so we
             # calculate the loss between these predictions and the "real image" labels
             # 13a)  build a new variable, labels_gen, which is a vector of ones of size 2*n_samples x 1
             # 13b)  build a new variable, gen_loss containing the binary cross entropy loss.
-            labels_gen = tf.ones((2 * n, 1))  
+        z = tf.random.normal((2 * nbatch, self.n_latent_dims))
+        with tf.GradientTape() as tape_gen:
+            images_fake = self.generator(z, training=True)
+            labels_pred = self.discriminator(images_fake, training=False)
+            labels_gen = tf.ones((2 * nbatch, 1))
             gen_loss = self.loss_bce(labels_gen, labels_pred)
+
 
 
         # 14. NOT indented: compute the gradient of the lost wrt the generator weights
         #  in a new variable, grads_gen store the gradients of gen_loss with respect to the generator's trainable weights         
-        grads_gen = tape_gen.gradient(gen_loss, self.generator.trainable_weights)
+
         
         # 15. Apply the weight updates
         #    use self.optimizer_gen to apply the weight updates. 
-        self.optimizer_gen.apply_gradients(zip(grads_gen, self.generator.trainable_weights))
+
         
         # 16. Update the running means of the losses including loss_gen_tracker and loss_disc_tracker
-        self.loss_gen_tracker.update_state(gen_loss)
-        self.loss_disc_tracker.update_state(disc_loss)
+
+
 
         # [ 17. ] Get the current values of these running means as a dict. These values
         # will be printed in the progress bar.
         # To help you along this is given. Just uncomment the "##" lines below
-        dictLosses = {loss.name: loss.result() for loss in self.metrics}
+        ##dictLosses = {loss.name: loss.result() for loss in self.metrics}
 
         # return the dictionary of losses
-        return dictLosses
+        ##return dictLosses
+        grads_gen = tape_gen.gradient(gen_loss, self.generator.trainable_variables)
+        self.optimizer_gen.apply_gradients(zip(grads_gen, self.generator.trainable_variables))
+
+        self.loss_disc_tracker.update_state(disc_loss)
+        self.loss_gen_tracker.update_state(gen_loss)
+
+        return {loss.name: loss.result() for loss in self.metrics}
 
     def get_config(self):
         # To allow saving and loading of a custom model, we need to implement a
@@ -418,7 +442,7 @@ class MultiTaskDiscriminator(Discriminator):
         Args:
             name (str, optional): Model name. Defaults to 'discriminator'.
         """        
-        super(Discriminator, self).__init__(name=name, **kwargs)
+        super().__init__(name=name, **kwargs)
         
         self.n_classes = n_classes
         
@@ -551,10 +575,14 @@ class ConditionalGAN(GAN):
         self.discriminator = MultiTaskDiscriminator(n_classes)
         
         # Categorical cross-entropy loss for discriminator classification
-        #==>  complete this line of code         
+        self.loss_class_fn = tf.keras.losses.CategoricalCrossentropy(from_logits=True)
+        self.metric_class = tf.keras.metrics.CategoricalAccuracy(name='class_acc')    
+        self.loss_gen_tracker = tf.keras.metrics.Mean(name="gen_loss")
+        self.loss_disc_tracker = tf.keras.metrics.Mean(name="disc_loss")
+        self.loss_fn_disc = tf.keras.losses.BinaryCrossentropy(from_logits=True)
+        self.loss_fn_gen = tf.keras.losses.BinaryCrossentropy(from_logits=True)
 
-        # Classification accuracy 
-        #==>  complete this line of code         
+  
      
         print(f"Loaded version: {__name__}")
 
@@ -562,9 +590,12 @@ class ConditionalGAN(GAN):
     def call(self, inputs, training=None):
         # ToImplement Exercise6a_part2 ==
         # ===============================
-        #==>  complete this method , roughly 5 to 7 lines of code
-        
+        n = tf.shape(inputs)[0]
+        class_random = self.generate_random_classes(n)
+        z_cond = tf.concat([inputs, class_random], axis=1)
+        images_fake = self.generator(z_cond, training=training)
         return images_fake
+        
         
     @property
     def metrics(self):
@@ -576,101 +607,91 @@ class ConditionalGAN(GAN):
                 self.metric_class]
     
     def generate_random_classes(self, n_samples):
-        # Generate random class labels from uniform distribution
-        class_probs = tf.ones((1, self.n_classes))
-        class_random = tf.random.categorical(class_probs, num_samples=n_samples)
-        class_random = tf.squeeze(class_random)
-        # Convert from categorical to one-hot
-        class_random = tf.one_hot(class_random, depth=self.n_classes, dtype=tf.float32)
-        return class_random
-    
-    ##def train_step(self, data):
-        # """Defines a single training iteration, including the forward pass,
-        # computation of losses, backpropagation, and weight updates.
+        class_ids = tf.random.uniform(shape=(n_samples,), minval=0, maxval=self.n_classes, dtype=tf.int32)
+        return tf.one_hot(class_ids, depth=self.n_classes)
 
-        # Args:
-        #     data (tensor): Input images.
 
-        # Returns:
-        #     dict: Loss values.
-        # """        
-        ##images_real, class_real = data[0]
+    def train_step(self, data):
+        """Defines a single training iteration, including the forward pass,
+        computation of losses, backpropagation, and weight updates.
 
-        # ToImplement Exercise6a_part3 ==
-        # ===============================        
-        #==>  complete this method, you can uncomment the ## lines above and below as hints
+        Args:
+            data (tensor): Input images.
 
+        Returns:
+            dict: Loss values.
+        """     
+        images_real, class_real = data[0]
+        nbatch = tf.shape(images_real)[0]
+        print("images_train:", images_real.shape)
+        print("labels_onehot:", class_real.shape)
 
         # Step 1: Train the discriminator
+        latent_fake = tf.random.normal((nbatch, self.n_latent_dims))
+        class_fake = self.generate_random_classes(nbatch)
+        z_cond_fake = tf.concat([latent_fake, class_fake], axis=1)
+        images_fake = self.generator(z_cond_fake, training=True)
 
-        # Generate images from random latent vectors.
+        # Labels for real and fake images
+        label_real = tf.ones((nbatch, 1))
+        label_fake = tf.zeros((nbatch, 1))
 
+        # Concatenate images and labels
+        images_disc = tf.concat([images_real, images_fake], axis=0)
+        labels_disc = tf.concat([label_real, label_fake], axis=0)
 
+        with tf.GradientTape() as gt:
+            # Discriminator predictions
+            pred_all, pred_class_all = self.discriminator(images_disc, training=True)
 
+            # Discriminator loss: real/fake
+            loss_disc_real_fake = self.loss_fn_disc(labels_disc, pred_all)
 
+            # Classification loss: real image classification
+            pred_class_real = pred_class_all[:nbatch] 
+            loss_disc_class = self.loss_class_fn(class_real, pred_class_real)
 
-        # Create label vectors, 1 for real and 0 for fake images
+            # Total discriminator loss
+            loss_disc_total = loss_disc_real_fake + loss_disc_class
 
+            # Update metric
+            self.metric_class.update_state(class_real, pred_class_real)
 
+        grads_disc = gt.gradient(loss_disc_total, self.discriminator.trainable_weights)
+        self.optimizer_disc.apply_gradients(zip(grads_disc, self.discriminator.trainable_weights))
 
-        # Concatenate real and fake images 
-
-
-
-        ##with tf.GradientTape() as gt:
-            # Predict with the discriminator
-            
-            # Compute discriminator loss for distinguishing real/fake images
-
-            # Compute discriminator loss for predicting image class, for real images only
-
-            # Add losses
-
-            
-            # Compute classification metric
-
-                                   
-        # Compute the gradient of the lost wrt the discriminator weights
-
-        
-        # Apply the weight updates
-
-        
         # Step 2: Train the generator
-                    
-        ##with tf.GradientTape() as gt2:
-            # Generate images from random latent vectors. Generate twice as many
-            # images as the batch size so that the generator sees as many
-            # samples as the discriminator did. 
+        latent_fake = tf.random.normal(( nbatch, self.n_latent_dims))
+        class_fake = self.generate_random_classes(nbatch)
+        z_cond_fake = tf.concat([latent_fake, class_fake], axis=1)
+
+        with tf.GradientTape() as gt2:
+            images_fake = self.generator(z_cond_fake, training=True)
+            pred_fake, pred_class_fake = self.discriminator(images_fake, training=False)
+            print("pred_class_fake:", pred_class_fake.shape)
+            print("class_fake     :", class_fake.shape)
+
+            # Generator tries to fool discriminator
+            labels_gen = tf.ones((nbatch, 1))
+            loss_gen_gan = self.loss_fn_gen(labels_gen, pred_fake)
+
+            # Generator tries to classify correctly
+
+            loss_gen_class = self.loss_class_fn(class_fake, pred_class_fake)
 
 
+            # Total generator loss
+            loss_gen_total = loss_gen_gan + self.cond_loss_weight * loss_gen_class
 
+        grads_gen = gt2.gradient(loss_gen_total, self.generator.trainable_weights)
+        self.optimizer_gen.apply_gradients(zip(grads_gen, self.generator.trainable_weights))
 
-            # Predict with the discriminator
+        # Update trackers
+        self.loss_gen_tracker.update_state(loss_gen_total)
+        self.loss_disc_tracker.update_state(loss_disc_total)
 
-            
-            # We want to the discriminator to think these images are real, so we
-            # calculate the loss between these predictions and the "real image"
-            # labels
-
-
-            # Compute loss between discriminator-predicted classes and the desired classes
-
-            # Add losses
-
-                        
-        # Compute the gradient of the lost wrt the generator weights
-
-        
-        # Apply the weight updates
-
-        
-        # Update the running means of the losses
-        
-        # Get the current values of these running means as a dict. These values
-        # will be printed in the progress bar.
-
-        ## return dictLosses
+        dictLosses = {loss.name: loss.result() for loss in self.metrics}
+        return dictLosses
 
     def get_config(self):
         # To allow saving and loading of a custom model, we need to implement a
